@@ -2540,8 +2540,12 @@ void AMDGPUOperand::addLiteralImmOperand(MCInst &Inst, int64_t Val, bool ApplyMo
     // truncated to uint32_t), if the target doesn't support 64-bit literals, or
     // the lit modifier is explicitly used, we need to truncate it to the 32
     // LSBs.
-    if (!AsmParser->has64BitLiterals() || Lit == LitModifier::Lit)
+    if (!AsmParser->has64BitLiterals() || Lit == LitModifier::Lit) {
+      if (!isInt<32>(Val) && !isUInt<32>(Val))
+        const_cast<AMDGPUAsmParser *>(AsmParser)->Error(
+            Inst.getLoc(), "literal value out of range");
       Val = Lo_32(Val);
+    }
     break;
 
   case AMDGPU::OPERAND_REG_IMM_FP64:
@@ -2563,6 +2567,10 @@ void AMDGPUOperand::addLiteralImmOperand(MCInst &Inst, int64_t Val, bool ApplyMo
       // 1) explicitly forced by using lit modifier;
       // 2) the value is a valid 32-bit representation (signed or unsigned),
       // meanwhile not forced by lit64 modifier.
+      if (Lit == LitModifier::Lit && !isInt<32>(Val) && !isUInt<32>(Val))
+        const_cast<AMDGPUAsmParser *>(AsmParser)->Error(
+            Inst.getLoc(), "literal value out of range");
+
       if (Lit == LitModifier::Lit ||
           (Lit != LitModifier::Lit64 && (isInt<32>(Val) || isUInt<32>(Val))))
         Val = static_cast<uint64_t>(Val) << 32;
